@@ -22,6 +22,17 @@ import (
 
 var Logger *slog.Logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
+type Video struct {
+	Title       string
+	Description string
+	CategoryId  string
+	FilePath    string
+}
+
+// 動画の公開ステータス（public, unlisted, private）
+// 一旦Privateでテストする
+var PrivacyStatus string = "private"
+
 func getClient(ctx context.Context, config *oauth2.Config) *http.Client {
 	Logger.Info("ctx context.Context", "detail", ctx)
 	Logger.Info("auth config", "detail", config)
@@ -164,6 +175,54 @@ func channelsListByUsername(service *youtube.Service, part []string, forUserName
 	fmt.Printf("ID is %s\nTitle is %s\n", response.Items[0].Id, response.Items[0].Snippet.Title)
 }
 
+// https://developers.google.com/youtube/v3/docs/videos/insert?hl=ja
+// UploadVideo : 動画をアップロードする
+func UploadVideo(service *youtube.Service, part []string) {
+	info := Video{}
+	fmt.Println("Title: ")
+	if _, err := fmt.Scan(&info.Title); err != nil {
+		Logger.Error("cant scan", "detail", err)
+		os.Exit(1)
+	}
+	fmt.Println("Description: ")
+	if _, err := fmt.Scan(&info.Description); err != nil {
+		Logger.Error("cant scan", "detail", err)
+		os.Exit(1)
+	}
+	// https://qiita.com/nabeyaki/items/c3d0421538c8faacb130
+	fmt.Println("CategoryId: ")
+	if _, err := fmt.Scan(&info.CategoryId); err != nil {
+		Logger.Error("cant scan", "detail", err)
+		os.Exit(1)
+	}
+	fmt.Println("VideoFIle fullpath: ")
+	if _, err := fmt.Scan(&info.FilePath); err != nil || info.FilePath == "" {
+		Logger.Error("cant scan", "detail", err)
+		os.Exit(1)
+	}
+	videoInfo := &youtube.Video{
+		Snippet: &youtube.VideoSnippet{
+			Title:       info.Title,
+			Description: info.Description,
+			CategoryId:  info.CategoryId,
+		},
+		Status: &youtube.VideoStatus{PrivacyStatus: PrivacyStatus},
+	}
+	call := service.Videos.Insert(part, videoInfo)
+
+	f, err := os.Open(info.FilePath)
+	if err != nil {
+		Logger.Error("cant open file", "detail", err)
+		os.Exit(1)
+	}
+	defer f.Close()
+
+	// Upload
+	response, err := call.Media(f).Do()
+	handleError(err, "")
+	fmt.Printf("Upload video done. VideoId: %v\n", response.Id)
+}
+
 func main() {
 	ctx := context.Background()
 
@@ -172,7 +231,8 @@ func main() {
 		Logger.Error("can not read client secret file", "Detail", err)
 	}
 
-	config, err := google.ConfigFromJSON(b, youtube.YoutubeReadonlyScope)
+	//config, err := google.ConfigFromJSON(b, youtube.YoutubeReadonlyScope)
+	config, err := google.ConfigFromJSON(b, youtube.YoutubeUploadScope)
 	if err != nil {
 		Logger.Error("can not parse Client secret file to config", "Detail", err)
 	}
@@ -181,5 +241,6 @@ func main() {
 
 	handleError(err, "cant Creating Youtube Client")
 
-	channelsListByUsername(service, []string{"snippet", "contentDetails"}, "GoogleDevelopers")
+	//channelsListByUsername(service, []string{"snippet", "contentDetails"}, "GoogleDevelopers")
+	UploadVideo(service, []string{"snipped", "status"})
 }
