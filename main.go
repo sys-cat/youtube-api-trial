@@ -242,5 +242,5 @@ func main() {
 	handleError(err, "cant Creating Youtube Client")
 
 	//channelsListByUsername(service, []string{"snippet", "contentDetails"}, "GoogleDevelopers")
-	UploadVideo(service, []string{"snipped", "status"})
+	UploadVideo(service, []string{"snippet", "status"})
 }
